@@ -1,0 +1,14 @@
+# Ambiente Virtual
+venv/
+.venv/
+
+# Arquivos temporários e de cache
+__pycache__/
+*.pyc
+*.egg-info/
+
+# Arquivos de configurações do IDE (VS Code)
+.vscode/
+
+# Arquivos de segredos ou variáveis de ambiente
+.env
