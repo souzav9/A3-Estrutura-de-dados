@@ -1,67 +1,281 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Simulação de Filas</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dashboard Bancário - Filas</title>
+  <style>
+    :root{--bg:#f4f6f9;--accent:#0a3d62;--card:#ffffff;--muted:#6b7280}
+    *{box-sizing:border-box;font-family:Inter,Segoe UI,Roboto,Arial,sans-serif}
+    body{margin:0;background:var(--bg);color:#111}
+    .app{display:flex;min-height:100vh}
+    .sidebar{width:260px;background:var(--accent);color:#fff;padding:24px;position:fixed;left:0;top:0;bottom:0}
+    .brand{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+    .brand img{width:48px;height:48px;border-radius:6px;object-fit:cover}
+    .brand h2{font-size:18px;margin:0}
 
-    <link rel="stylesheet" href="style.css" />
+    .nav a{display:block;color:#dbe7ff;text-decoration:none;padding:10px 8px;border-radius:8px;margin:6px 0}
+    .nav a.active, .nav a:hover{background:rgba(255,255,255,0.06);color:#fff}
+
+    .main{margin-left:260px;padding:28px;flex:1}
+    .top{display:flex;align-items:center;justify-content:space-between;gap:20px}
+    .top h1{font-size:22px;margin:0}
+
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;margin-top:20px}
+    .card{background:var(--card);padding:18px;border-radius:12px;box-shadow:0 6px 18px rgba(13,38,59,0.06)}
+    .stat{font-size:28px;font-weight:700;margin-top:8px}
+    .muted{color:var(--muted);font-size:13px}
+
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
+    input,select,button{width:100%;padding:10px;border-radius:8px;border:1px solid #e6eef7;font-size:14px}
+    button.primary{background:var(--accent);color:#fff;border:none}
+    .small{font-size:13px}
+
+    .queues{display:flex;gap:12px;overflow:auto}
+    .queue{min-width:220px}
+    .queue h4{margin:0 0 8px 0}
+    .client{padding:8px;border-radius:8px;border:1px solid #eef6ff;margin-bottom:8px;background:#fbfdff}
+
+    pre{background:#0b1220;color:#dbe9ff;padding:12px;border-radius:8px;overflow:auto}
+
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+
+    @media (max-width:800px){.sidebar{position:relative;width:100%;height:auto}.main{margin-left:0;padding:16px}}
+  </style>
 </head>
-
 <body>
-    <header>
-        <h1>Gerenciador de Filas</h1>
-    </header>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="/mnt/data/7dc5bc36-5d1e-4d61-a69d-921f823d0f8a.png" alt="logo" />
+        <div>
+          <h2>Banco Central</h2>
+          <div style="font-size:12px;opacity:0.9">Painel de Atendimento</div>
+        </div>
+      </div>
 
-    <main class="container">
-        <!-- Cadastro -->
-        <section class="card">
-            <h2>Cadastrar Cliente</h2>
-            <form id="form-cadastro">
+      <nav class="nav">
+        <a class="active" href="#">Dashboard</a>
+        <a href="#cadastrar">Cadastrar Cliente</a>
+        <a href="#filas">Filas</a>
+        <a href="#relatorio">Relatórios</a>
+        <a href="#config">Configurações</a>
+      </nav>
 
-                <label>ID do Cliente:</label>
-                <input type="number" id="id" required />
+      <div style="position:absolute;bottom:20px;left:24px;right:24px;color:#dbe7ff;font-size:13px">
+        v1.0 • Local
+      </div>
+    </aside>
 
-                <label>Nome:</label>
-                <input type="text" id="nome" required />
+    <main class="main">
+      <div class="top">
+        <div>
+          <h1>Dashboard de Atendimento — Filas</h1>
+          <div class="muted">Monitore e controle atendimentos em tempo lógico</div>
+        </div>
+        <div class="actions">
+          <button id="btn-refresh" class="primary">Atualizar Filas</button>
+          <button id="btn-process" class="primary">Processar Próximo</button>
+          <button id="btn-simular">Simular Completo</button>
+          <button id="btn-stats">Mostrar Estatísticas</button>
+        </div>
+      </div>
 
-                <label>Tipo:</label>
-                <select id="tipo">
-                    <option value="comum">Comum</option>
-                    <option value="preferencial">Preferencial</option>
-                    <option value="corporativo">Corporativo</option>
-                </select>
+      <section class="grid" style="margin-top:18px">
+        <div class="card">
+          <div class="muted">Clientes na fila</div>
+          <div id="fila-total" class="stat">0</div>
+          <div class="muted">Total de clientes aguardando atendimento</div>
+        </div>
 
-                <label>Tempo estimado (min):</label>
-                <input type="number" id="tempo" required />
+        <div class="card">
+          <div class="muted">Tempo médio de espera</div>
+          <div id="media-espera" class="stat">0 min</div>
+          <div class="muted">Média calculada a partir da última simulação</div>
+        </div>
 
-                <label>Horário de chegada:</label>
-                <input type="time" id="chegada" required />
+        <div class="card">
+          <div class="muted">Atendimentos realizados</div>
+          <div id="atendidos" class="stat">0</div>
+          <div class="muted">Desde o último reset</div>
+        </div>
+      </section>
 
-                <button type="submit">Cadastrar</button>
-            </form>
-        </section>
+      <section class="card" id="cadastrar" style="margin-top:20px">
+        <h3>Cadastrar Cliente</h3>
+        <form id="form-cadastrar">
+          <div class="form-row">
+            <div>
+              <label>ID</label>
+              <input id="input-id" required />
+            </div>
+            <div>
+              <label>Nome</label>
+              <input id="input-nome" required />
+            </div>
+          </div>
 
-        <!-- Botões -->
-        <section class="card">
-            <h2>Operações</h2>
-            <button id="btn-processar">Processar Atendimento</button>
-            <button id="btn-estatisticas">Mostrar Estatísticas</button>
-        </section>
+          <div class="form-row" style="margin-top:10px">
+            <div>
+              <label>Tipo</label>
+              <select id="input-tipo">
+                <option value="comum">Comum</option>
+                <option value="preferencial">Preferencial</option>
+                <option value="corporativo">Corporativo</option>
+              </select>
+            </div>
+            <div>
+              <label>Tempo estimado (min)</label>
+              <input id="input-tempo" type="number" step="0.1" value="7" />
+            </div>
+          </div>
 
-        <!-- Filas -->
-        <section class="card">
-            <h2>Filas</h2>
-            <div id="filas"></div>
-        </section>
+          <div style="margin-top:10px">
+            <label>Horário de chegada (min do dia)</label>
+            <input id="input-chegada" type="number" step="0.1" value="0" />
+          </div>
 
-        <!-- Estatísticas -->
-        <section class="card">
-            <h2>Estatísticas</h2>
-            <pre id="estatisticas"></pre>
-        </section>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button type="submit" class="primary">Cadastrar</button>
+            <label class="small" style="align-self:center">ou importar CSV:</label>
+            <input id="input-file" type="file" accept=".csv" />
+            <button id="btn-upload" type="button">Upload CSV</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card" id="filas" style="margin-top:20px">
+        <h3>Filas Atuais</h3>
+        <div class="queues" id="queues-root" style="margin-top:12px">
+          <div class="queue card">
+            <h4>Corporativo</h4>
+            <div id="fila-corporativo"></div>
+          </div>
+          <div class="queue card">
+            <h4>Preferencial</h4>
+            <div id="fila-preferencial"></div>
+          </div>
+          <div class="queue card">
+            <h4>Comum</h4>
+            <div id="fila-comum"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="relatorio" style="margin-top:20px">
+        <h3>Relatório / Estatísticas</h3>
+        <pre id="rel-text">Sem dados ainda. Use "Simular Completo" para gerar relatório.</pre>
+      </section>
+
     </main>
+  </div>
 
-    <script src="script.js"></script>
+  <script>
+    const API = 'http://127.0.0.1:8000';
+
+    // util
+    function el(id){return document.getElementById(id)}
+    function fmt(n){return (Math.round(n*100)/100).toFixed(2)}
+
+    async function refreshQueues(){
+      try{
+        const res = await fetch(API + '/filas');
+        const data = await res.json();
+        const f = data.filas || {};
+        ['corporativo','preferencial','comum'].forEach(k => {
+          const root = el('fila-'+k);
+          root.innerHTML = '';
+          const arr = f[k] || [];
+          arr.forEach(c => {
+            const div = document.createElement('div'); div.className='client';
+            div.innerHTML = `<strong>${c.id}</strong> • ${c.nome} <div class="muted">${c.tempo_servico} min • chegada ${c.chegada}</div>`;
+            root.appendChild(div);
+          })
+        })
+        const total = (f.corporativo?.length||0)+(f.preferencial?.length||0)+(f.comum?.length||0);
+        el('fila-total').textContent = total;
+      }catch(err){console.error(err);alert('Erro ao buscar filas. Veja console.')}
+    }
+
+    async function cadastrarCliente(ev){
+      ev.preventDefault();
+      const payload = {
+        id: String(el('input-id').value || Date.now()),
+        nome: el('input-nome').value || '---',
+        tipo: el('input-tipo').value,
+        tempo_servico: Number(el('input-tempo').value) || 5,
+        chegada: Number(el('input-chegada').value) || 0
+      };
+      try{
+        const res = await fetch(API + '/cadastrar', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        const data = await res.json();
+        if(res.ok){
+          alert('Cadastrado: ' + payload.id);
+          document.getElementById('form-cadastrar').reset();
+          refreshQueues();
+        }else{alert(JSON.stringify(data))}
+      }catch(e){console.error(e);alert('Erro ao cadastrar')}
+    }
+
+    async function uploadCSV(){
+      const input = el('input-file');
+      if(!input.files.length){alert('Selecione um arquivo');return}
+      const fd = new FormData(); fd.append('file', input.files[0]);
+      try{
+        const res = await fetch(API + '/carregar_csv', {method:'POST',body:fd});
+        const data = await res.json();
+        if(res.ok){alert('Importados: ' + data.importados);refreshQueues();}
+        else alert(JSON.stringify(data));
+      }catch(e){console.error(e);alert('Erro upload')}
+    }
+
+    async function processar(){
+      try{
+        const res = await fetch(API + '/processar', {method:'POST'});
+        const data = await res.json();
+        if(res.ok){alert('Atendido: ' + (data.cliente_atendido?.id || ''))}
+        else if(data.status==='vazio') alert('Fila vazia')
+        else alert(JSON.stringify(data));
+        refreshQueues();
+      }catch(e){console.error(e);alert('Erro processar')}
+    }
+
+    async function simular(){
+      try{
+        const res = await fetch(API + '/simular', {method:'POST'});
+        const data = await res.json();
+        if(res.ok){
+          el('rel-text').textContent = JSON.stringify(data.stats, null, 2);
+          alert('Simulação completa. Relatório salvo no servidor.');
+        } else alert(JSON.stringify(data));
+        refreshQueues();
+      }catch(e){console.error(e);alert('Erro simular')}
+    }
+
+    async function mostrarStats(){
+      try{
+        const res = await fetch(API + '/estatisticas');
+        const data = await res.json();
+        if(data.status==='ok'){
+          const s = data.stats;
+          el('rel-text').textContent = JSON.stringify(s, null, 2);
+          el('media-espera').textContent = (s.tempo_medio_espera||0).toFixed(2) + ' min';
+          el('atendidos').textContent = s.n_atendidos || 0;
+        } else alert(JSON.stringify(data));
+      }catch(e){console.error(e);alert('Erro ao obter estatísticas')}
+    }
+
+    // event bindings
+    document.getElementById('form-cadastrar').addEventListener('submit', cadastrarCliente);
+    document.getElementById('btn-refresh').addEventListener('click', refreshQueues);
+    document.getElementById('btn-upload').addEventListener('click', uploadCSV);
+    document.getElementById('btn-process').addEventListener('click', processar);
+    document.getElementById('btn-simular').addEventListener('click', simular);
+    document.getElementById('btn-stats').addEventListener('click', mostrarStats);
+
+    // initial
+    setTimeout(()=>{refreshQueues();mostrarStats()},200);
+  </script>
 </body>
 </html>
